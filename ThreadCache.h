@@ -5,18 +5,22 @@
 class ThreadCache
 {
 public:
-	// ÉêÇëºÍÊÍ·ÅÄÚ´æ¶ÔÏó
+	// ç”³è¯·å’Œé‡Šæ”¾å†…å­˜å¯¹è±¡
 	void* Allocate(size_t size);
 	void Deallocate(void* ptr, size_t size);
 
-	// ´ÓÖĞĞÄ»º´æ»ñÈ¡¶ÔÏó
+	// ä»ä¸­å¿ƒç¼“å­˜è·å–å¯¹è±¡
 	void* FetchFromCentralCache(size_t index, size_t size);
 
-	// ÊÍ·Å¶ÔÏóÊ±£¬Á´±í¹ı³¤Ê±£¬»ØÊÕÄÚ´æ»Øµ½ÖĞĞÄ»º´æ
+	// é‡Šæ”¾å¯¹è±¡æ—¶ï¼Œé“¾è¡¨è¿‡é•¿æ—¶ï¼Œå›æ”¶å†…å­˜å›åˆ°ä¸­å¿ƒç¼“å­˜
 	void ListTooLong(FreeList& list, size_t size);
 private:
 	FreeList _freeLists[NFREELIST];
 };
 
 // TLS thread local storage
+#ifdef _WIN32
 static _declspec(thread) ThreadCache* pTLSThreadCache = nullptr;
+#else
+static __thread ThreadCache* pTLSThreadCache = nullptr;
+#endif

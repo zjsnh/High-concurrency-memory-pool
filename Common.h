@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <map>
 #include <algorithm>
+#include <cstring>
 
 #include <time.h>
 #include <assert.h>
@@ -12,6 +13,13 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+
+#ifdef __linux__
+#include <sys/mman.h>
+#endif
+
+// å®šä¹‰ASSERTå®
+#define ASSERT assert
 
 using std::cout;
 using std::endl;
@@ -27,24 +35,20 @@ static const size_t NFREELIST = 208;
 static const size_t NPAGES = 129;
 static const size_t PAGE_SHIFT = 13;
 
-#ifdef _WIN64
-	typedef unsigned long long PAGE_ID;
-#elif _WIN32
-	typedef size_t PAGE_ID;
-#else
-	// linux
-#endif
+// å®šä¹‰PAGE_ID
+typedef size_t PAGE_ID;
 
-// Ö±½ÓÈ¥¶ÑÉÏ°´Ò³ÉêÇë¿Õ¼ä
+// ç›´æ¥å»å †ä¸ŠæŒ‰é¡µç”³è¯·ç©ºé—´
 inline static void* SystemAlloc(size_t kpage)
 {
 #ifdef _WIN32
 	void* ptr = VirtualAlloc(0, kpage << 13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 #else
-	// linuxÏÂbrk mmapµÈ
+	// linuxä¸‹ä½¿ç”¨mmap
+	void* ptr = mmap(nullptr, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #endif
 
-	if (ptr == nullptr)
+	if (ptr == nullptr || ptr == MAP_FAILED)
 		throw std::bad_alloc();
 
 	return ptr;
@@ -56,7 +60,8 @@ inline static void SystemFree(void* ptr)
 #ifdef _WIN32
 	VirtualFree(ptr, 0, MEM_RELEASE);
 #else
-	// sbrk unmmapµÈ
+	// linuxä¸‹ä½¿ç”¨munmap
+	munmap(ptr, 0);
 #endif
 }
 
@@ -66,7 +71,7 @@ static void*& NextObj(void* obj)
 }
 
 
-// ¹ÜÀíÇĞ·ÖºÃµÄĞ¡¶ÔÏóµÄ×ÔÓÉÁ´±í
+// ç®¡ç†åˆ‡åˆ†å¥½çš„å°å¯¹è±¡çš„è‡ªç”±é“¾è¡¨
 class FreeList
 {
 public:
@@ -74,7 +79,7 @@ public:
 	{
 		assert(obj);
 
-		// Í·²å
+		// å¤´æ’
 		//*(void**)obj = _freeList;
 		NextObj(obj) = _freeList;
 		_freeList = obj;
@@ -87,7 +92,7 @@ public:
 		NextObj(end) = _freeList;
 		_freeList = start;
 
-		// ²âÊÔÑéÖ¤+Ìõ¼ş¶Ïµã
+		// æµ‹è¯•éªŒè¯+æ¡ä»¶æ–­ç‚¹
 		/*int i = 0;
 		void* cur = start;
 		while (cur)
@@ -124,7 +129,7 @@ public:
 	{
 		assert(_freeList);
 
-		// Í·É¾
+		// å¤´åˆ 
 		void* obj = _freeList;
 		_freeList = NextObj(obj);
 		--_size;
@@ -153,16 +158,16 @@ private:
 	size_t _size = 0;
 };
 
-// ¼ÆËã¶ÔÏó´óĞ¡µÄ¶ÔÆëÓ³Éä¹æÔò
+// è®¡ç®—å¯¹è±¡å¤§å°çš„å¯¹é½æ˜ å°„è§„åˆ™
 class SizeClass
 {
 public:
-	// ÕûÌå¿ØÖÆÔÚ×î¶à10%×óÓÒµÄÄÚËéÆ¬ÀË·Ñ
-	// [1,128]					8byte¶ÔÆë	    freelist[0,16)
-	// [128+1,1024]				16byte¶ÔÆë	    freelist[16,72)
-	// [1024+1,8*1024]			128byte¶ÔÆë	    freelist[72,128)
-	// [8*1024+1,64*1024]		1024byte¶ÔÆë     freelist[128,184)
-	// [64*1024+1,256*1024]		8*1024byte¶ÔÆë   freelist[184,208)
+	// æ•´ä½“æ§åˆ¶åœ¨æœ€å¤š10%å·¦å³çš„å†…ç¢ç‰‡æµªè´¹
+	// [1,128]					8byteå¯¹é½	    freelist[0,16)
+	// [128+1,1024]				16byteå¯¹é½	    freelist[16,72)
+	// [1024+1,8*1024]			128byteå¯¹é½	    freelist[72,128)
+	// [8*1024+1,64*1024]		1024byteå¯¹é½     freelist[128,184)
+	// [64*1024+1,256*1024]		8*1024byteå¯¹é½   freelist[184,208)
 
 	/*size_t _RoundUp(size_t size, size_t alignNum)
 	{
@@ -238,12 +243,12 @@ public:
 		return ((bytes + (1 << align_shift) - 1) >> align_shift) - 1;
 	}
 
-	// ¼ÆËãÓ³ÉäµÄÄÄÒ»¸ö×ÔÓÉÁ´±íÍ°
+	// è®¡ç®—æ˜ å°„çš„å“ªä¸€ä¸ªè‡ªç”±é“¾è¡¨æ¡¶
 	static inline size_t Index(size_t bytes)
 	{
 		assert(bytes <= MAX_BYTES);
 
-		// Ã¿¸öÇø¼äÓĞ¶àÉÙ¸öÁ´
+		// æ¯ä¸ªåŒºé—´æœ‰å¤šå°‘ä¸ªé“¾
 		static int group_array[4] = { 16, 56, 56, 56 };
 		if (bytes <= 128){
 			return _Index(bytes, 3);
@@ -267,14 +272,14 @@ public:
 		return -1;
 	}
 
-	// Ò»´Îthread cache´ÓÖĞĞÄ»º´æ»ñÈ¡¶àÉÙ¸ö
+	// ä¸€æ¬¡thread cacheä»ä¸­å¿ƒç¼“å­˜è·å–å¤šå°‘ä¸ª
 	static size_t NumMoveSize(size_t size)
 	{
 		assert(size > 0);
 
-		// [2, 512]£¬Ò»´ÎÅúÁ¿ÒÆ¶¯¶àÉÙ¸ö¶ÔÏóµÄ(ÂıÆô¶¯)ÉÏÏŞÖµ
-		// Ğ¡¶ÔÏóÒ»´ÎÅúÁ¿ÉÏÏŞ¸ß
-		// Ğ¡¶ÔÏóÒ»´ÎÅúÁ¿ÉÏÏŞµÍ
+		// [2, 512]ï¼Œä¸€æ¬¡æ‰¹é‡ç§»åŠ¨å¤šå°‘ä¸ªå¯¹è±¡çš„(æ…¢å¯åŠ¨)ä¸Šé™å€¼
+		// å°å¯¹è±¡ä¸€æ¬¡æ‰¹é‡ä¸Šé™é«˜
+		// å°å¯¹è±¡ä¸€æ¬¡æ‰¹é‡ä¸Šé™ä½
 		int num = MAX_BYTES / size;
 		if (num < 2)
 			num = 2;
@@ -285,10 +290,10 @@ public:
 		return num;
 	}
 
-	// ¼ÆËãÒ»´ÎÏòÏµÍ³»ñÈ¡¼¸¸öÒ³
-	// µ¥¸ö¶ÔÏó 8byte
+	// è®¡ç®—ä¸€æ¬¡å‘ç³»ç»Ÿè·å–å‡ ä¸ªé¡µ
+	// å•ä¸ªå¯¹è±¡ 8byte
 	// ...
-	// µ¥¸ö¶ÔÏó 256KB
+	// å•ä¸ªå¯¹è±¡ 256KB
 	static size_t NumMovePage(size_t size)
 	{
 		size_t num = NumMoveSize(size);
@@ -302,23 +307,23 @@ public:
 	}
 };
 
-// ¹ÜÀí¶à¸öÁ¬ĞøÒ³´ó¿éÄÚ´æ¿ç¶È½á¹¹
+// ç®¡ç†å¤šä¸ªè¿ç»­é¡µå¤§å—å†…å­˜è·¨åº¦ç»“æ„
 struct Span
 {
-	PAGE_ID _pageId = 0; // ´ó¿éÄÚ´æÆğÊ¼Ò³µÄÒ³ºÅ
-	size_t  _n = 0;      // Ò³µÄÊıÁ¿
+	PAGE_ID _pageId = 0; // å¤§å—å†…å­˜èµ·å§‹é¡µçš„é¡µå·
+	size_t  _n = 0;      // é¡µçš„æ•°é‡
 
-	Span* _next = nullptr;	// Ë«ÏòÁ´±íµÄ½á¹¹
+	Span* _next = nullptr;	// åŒå‘é“¾è¡¨çš„ç»“æ„
 	Span* _prev = nullptr;
 
-	size_t _objSize = 0;  // ÇĞºÃµÄĞ¡¶ÔÏóµÄ´óĞ¡
-	size_t _useCount = 0; // ÇĞºÃĞ¡¿éÄÚ´æ£¬±»·ÖÅä¸øthread cacheµÄ¼ÆÊı
-	void* _freeList = nullptr;  // ÇĞºÃµÄĞ¡¿éÄÚ´æµÄ×ÔÓÉÁ´±í
+	size_t _objSize = 0;  // åˆ‡å¥½çš„å°å¯¹è±¡çš„å¤§å°
+	size_t _useCount = 0; // åˆ‡å¥½å°å—å†…å­˜ï¼Œè¢«åˆ†é…ç»™thread cacheçš„è®¡æ•°
+	void* _freeList = nullptr;  // åˆ‡å¥½çš„å°å—å†…å­˜çš„è‡ªç”±é“¾è¡¨
 
-	bool _isUse = false;          // ÊÇ·ñÔÚ±»Ê¹ÓÃ
+	bool _isUse = false;          // æ˜¯å¦åœ¨è¢«ä½¿ç”¨
 };
 
-// ´øÍ·Ë«ÏòÑ­»·Á´±í 
+// å¸¦å¤´åŒå‘å¾ªç¯é“¾è¡¨ 
 class SpanList
 {
 public:
@@ -374,8 +379,8 @@ public:
 		assert(pos);
 		assert(pos != _head);
 
-		// 1¡¢Ìõ¼ş¶Ïµã
-		// 2¡¢²é¿´Õ»Ö¡
+		// 1ã€æ¡ä»¶æ–­ç‚¹
+		// 2ã€æŸ¥çœ‹æ ˆå¸§
 		/*if (pos == _head)
 		{
 		int x = 0;
@@ -391,5 +396,5 @@ public:
 private:
 	Span* _head;
 public:
-	std::mutex _mtx; // Í°Ëø
+	std::mutex _mtx; // æ¡¶é”
 };

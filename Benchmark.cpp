@@ -1,12 +1,12 @@
 #include"ConcurrentAlloc.h"
 
-// ntimes Ò»ÂÖÉêÇëºÍÊÍ·ÅÄÚ´æµÄ´ÎÊý
-// rounds ÂÖ´Î
+// ntimes ä¸€è½®ç”³è¯·å’Œé‡Šæ”¾å†…å­˜çš„æ¬¡æ•°
+// rounds è½®æ¬¡
 void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds)
 {
 	std::vector<std::thread> vthread(nworks);
-	std::atomic<size_t> malloc_costtime = 0;
-	std::atomic<size_t> free_costtime = 0;
+	std::atomic<size_t> malloc_costtime(0);
+	std::atomic<size_t> free_costtime(0);
 
 	for (size_t k = 0; k < nworks; ++k)
 	{
@@ -43,23 +43,23 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds)
 		t.join();
 	}
 
-	printf("%u¸öÏß³Ì²¢·¢Ö´ÐÐ%uÂÖ´Î£¬Ã¿ÂÖ´Îmalloc %u´Î: »¨·Ñ£º%u ms\n",
-		nworks, rounds, ntimes, malloc_costtime);
+	printf("%luä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%luè½®æ¬¡ï¼Œæ¯è½®æ¬¡malloc %luæ¬¡: èŠ±è´¹ï¼š%lu ms\n",
+					nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("%u¸öÏß³Ì²¢·¢Ö´ÐÐ%uÂÖ´Î£¬Ã¿ÂÖ´Îfree %u´Î: »¨·Ñ£º%u ms\n",
-		nworks, rounds, ntimes, free_costtime);
+			printf("%luä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%luè½®æ¬¡ï¼Œæ¯è½®æ¬¡free %luæ¬¡: èŠ±è´¹ï¼š%lu ms\n",
+					nworks, rounds, ntimes, free_costtime.load());
 
-	printf("%u¸öÏß³Ì²¢·¢malloc&free %u´Î£¬×Ü¼Æ»¨·Ñ£º%u ms\n",
-		nworks, nworks*rounds*ntimes, malloc_costtime + free_costtime);
+			printf("%luä¸ªçº¿ç¨‹å¹¶å‘malloc&free %luæ¬¡ï¼Œæ€»è®¡èŠ±è´¹ï¼š%lu ms\n",
+					nworks, nworks*rounds*ntimes, malloc_costtime.load() + free_costtime.load());
 }
 
 
-// µ¥ÂÖ´ÎÉêÇëÊÍ·Å´ÎÊý Ïß³ÌÊý ÂÖ´Î
+// å•è½®æ¬¡ç”³è¯·é‡Šæ”¾æ¬¡æ•° çº¿ç¨‹æ•° è½®æ¬¡
 void BenchmarkConcurrentMalloc(size_t ntimes, size_t nworks, size_t rounds)
 {
 	std::vector<std::thread> vthread(nworks);
-	std::atomic<size_t> malloc_costtime = 0;
-	std::atomic<size_t> free_costtime = 0;
+	std::atomic<size_t> malloc_costtime(0);
+	std::atomic<size_t> free_costtime(0);
 
 	for (size_t k = 0; k < nworks; ++k)
 	{
@@ -96,14 +96,14 @@ void BenchmarkConcurrentMalloc(size_t ntimes, size_t nworks, size_t rounds)
 		t.join();
 	}
 
-	printf("%u¸öÏß³Ì²¢·¢Ö´ÐÐ%uÂÖ´Î£¬Ã¿ÂÖ´Îconcurrent alloc %u´Î: »¨·Ñ£º%u ms\n",
-		nworks, rounds, ntimes, malloc_costtime);
+	printf("%luä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%luè½®æ¬¡ï¼Œæ¯è½®æ¬¡concurrent alloc %luæ¬¡: èŠ±è´¹ï¼š%lu ms\n",
+					nworks, rounds, ntimes, malloc_costtime.load());
 
-	printf("%u¸öÏß³Ì²¢·¢Ö´ÐÐ%uÂÖ´Î£¬Ã¿ÂÖ´Îconcurrent dealloc %u´Î: »¨·Ñ£º%u ms\n",
-		nworks, rounds, ntimes, free_costtime);
+			printf("%luä¸ªçº¿ç¨‹å¹¶å‘æ‰§è¡Œ%luè½®æ¬¡ï¼Œæ¯è½®æ¬¡concurrent dealloc %luæ¬¡: èŠ±è´¹ï¼š%lu ms\n",
+					nworks, rounds, ntimes, free_costtime.load());
 
-	printf("%u¸öÏß³Ì²¢·¢concurrent alloc&dealloc %u´Î£¬×Ü¼Æ»¨·Ñ£º%u ms\n",
-		nworks, nworks*rounds*ntimes, malloc_costtime + free_costtime);
+			printf("%luä¸ªçº¿ç¨‹å¹¶å‘concurrent alloc&dealloc %luæ¬¡ï¼Œæ€»è®¡èŠ±è´¹ï¼š%lu ms\n",
+					nworks, nworks*rounds*ntimes, malloc_costtime.load() + free_costtime.load());
 }
 
 int main()

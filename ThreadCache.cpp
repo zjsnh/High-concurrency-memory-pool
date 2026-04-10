@@ -3,12 +3,12 @@
 
 void* ThreadCache::FetchFromCentralCache(size_t index, size_t size)
 {
-	// Âı¿ªÊ¼·´À¡µ÷½ÚËã·¨
-	// 1¡¢×î¿ªÊ¼²»»áÒ»´ÎÏòcentral cacheÒ»´ÎÅúÁ¿ÒªÌ«¶à£¬ÒòÎªÒªÌ«¶àÁË¿ÉÄÜÓÃ²»Íê
-	// 2¡¢Èç¹ûÄã²»ÒªÕâ¸ösize´óĞ¡ÄÚ´æĞèÇó£¬ÄÇÃ´batchNum¾Í»á²»¶ÏÔö³¤£¬Ö±µ½ÉÏÏŞ
-	// 3¡¢sizeÔ½´ó£¬Ò»´ÎÏòcentral cacheÒªµÄbatchNum¾ÍÔ½Ğ¡
-	// 4¡¢sizeÔ½Ğ¡£¬Ò»´ÎÏòcentral cacheÒªµÄbatchNum¾ÍÔ½´ó
-	size_t batchNum = min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(size));
+	// æ…¢å¼€å§‹åé¦ˆè°ƒèŠ‚ç®—æ³•
+	// 1ã€æœ€å¼€å§‹ä¸ä¼šä¸€æ¬¡å‘central cacheä¸€æ¬¡æ‰¹é‡è¦å¤ªå¤šï¼Œå› ä¸ºè¦å¤ªå¤šäº†å¯èƒ½ç”¨ä¸å®Œ
+	// 2ã€å¦‚æœä½ ä¸è¦è¿™ä¸ªsizeå¤§å°å†…å­˜éœ€æ±‚ï¼Œé‚£ä¹ˆbatchNumå°±ä¼šä¸æ–­å¢é•¿ï¼Œç›´åˆ°ä¸Šé™
+	// 3ã€sizeè¶Šå¤§ï¼Œä¸€æ¬¡å‘central cacheè¦çš„batchNumå°±è¶Šå°
+	// 4ã€sizeè¶Šå°ï¼Œä¸€æ¬¡å‘central cacheè¦çš„batchNumå°±è¶Šå¤§
+	size_t batchNum = std::min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(size));
 	if (_freeLists[index].MaxSize() == batchNum)
 	{
 		_freeLists[index].MaxSize() += 1;
@@ -52,11 +52,11 @@ void ThreadCache::Deallocate(void* ptr, size_t size)
 	assert(ptr);
 	assert(size <= MAX_BYTES);
 
-	// ÕÒ¶ÔÓ³ÉäµÄ×ÔÓÉÁ´±íÍ°£¬¶ÔÏó²åÈë½øÈë
+	// æ‰¾å¯¹æ˜ å°„çš„è‡ªç”±é“¾è¡¨æ¡¶ï¼Œå¯¹è±¡æ’å…¥è¿›å…¥
 	size_t index = SizeClass::Index(size);
 	_freeLists[index].Push(ptr);
 
-	// µ±Á´±í³¤¶È´óÓÚÒ»´ÎÅúÁ¿ÉêÇëµÄÄÚ´æÊ±¾Í¿ªÊ¼»¹Ò»¶Îlist¸øcentral cache
+	// å½“é“¾è¡¨é•¿åº¦å¤§äºä¸€æ¬¡æ‰¹é‡ç”³è¯·çš„å†…å­˜æ—¶å°±å¼€å§‹è¿˜ä¸€æ®µlistç»™central cache
 	if (_freeLists[index].Size() >= _freeLists[index].MaxSize())
 	{
 		ListTooLong(_freeLists[index], size);
